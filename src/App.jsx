@@ -704,7 +704,7 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
 function Styles() {
   return (
     <style>{`
-.k-root *, .k-root *::before, .k-root *::after { box-sizing:border-box; }
+.k-root, .k-root *, .k-root *::before, .k-root *::after { box-sizing:border-box; }
 .k-root {
   --line:#2E3852; --sandal:#EFE6D6; --muted:#8D96AB; --amber:#E9A94A; --sage:#7FB3A6; --slate:#232C40;
   min-height:100vh; margin:0 auto; max-width:560px; padding:22px 18px 40px;
