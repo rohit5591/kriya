@@ -16,6 +16,7 @@ const FILES = [
   { practice: "Mudra Pranayam",                            file: "Mudra Pranayams.mp3" },
   { practice: "3 Stage",         teacher: "Dinesh",        file: "3-Stage - Dinesh.mp3" },
   { practice: "Bhastrika",       teacher: "Dinesh",        file: "Bhastrika - Dinesh.mp3" },
+  { practice: "3 Stage + Bhastrika (Fast)", id: "fast-kriya-practice", file: "Fast Kriya - Annales.mp3" },
   { practice: "Sanyam 2 Bells",                            file: "Sanyam 2 Bells.mp3" },
   { practice: "Sahaj",           teacher: "Bhanu Di",      variant: "Regular", file: "BhanuDiSahaj.mp3" },
   { practice: "Sahaj",           teacher: "Bhanu Di",      variant: "Trimmed", file: "BhanuDiSahaj-Trimmed.mp3" },
@@ -50,7 +51,7 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g
 const urlFor = (file) => BASE + encodeURIComponent(file);
 
 const LIBRARY = FILES.map((f) => ({
-  ...f, id: slug(f.file), kind: "practice", url: urlFor(f.file),
+  ...f, id: f.id || slug(f.file), kind: "practice", url: urlFor(f.file),
 }));
 const PATH_TRACKS = FULL.map((f) => ({
   ...f, practice: f.name, id: slug(f.file), kind: "full", url: urlFor(f.file),
