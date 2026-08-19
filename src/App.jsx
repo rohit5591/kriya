@@ -42,6 +42,34 @@ const TEACHERS = ["General", "Vishal", "Kashi Bhai", "Dinesh", "Mayur Karthik", 
 /* Full kriyas shown under the General tab, regardless of who teaches them. */
 const GENERAL_FILES = ["Fast Kriya - Annales.mp3", "Dinesh-Kriya.mp3"];
 
+/* Pre-built kriyas, backfilled into "My kriyas" if missing by id
+   (won't duplicate or reappear-fight a deliberate edit to the same id). */
+const DEFAULT_SEQUENCES = [
+  {
+    id: "advanced-kriya-with-yoga",
+    name: "Advanced Kriya with Yoga",
+    steps: [
+      { t: "mayur-karthik-padmasadhana-mp3", k: "s1" },
+      { t: "3-stage-dinesh-mp3",             k: "s2" },
+      { t: "bhastrika-dinesh-mp3",           k: "s3" },
+      { t: "mudra-pranayams-mp3",            k: "s4" },
+      { t: "kriya-empty-audio-mp3",          k: "s5" },
+      { t: "bhanudisahaj-mp3",               k: "s6" },
+    ],
+  },
+  {
+    id: "advanced-kriya-no-yoga",
+    name: "Advanced Kriya no Yoga",
+    steps: [
+      { t: "3-stage-dinesh-mp3",    k: "s1" },
+      { t: "bhastrika-dinesh-mp3",  k: "s2" },
+      { t: "mudra-pranayams-mp3",   k: "s3" },
+      { t: "kriya-empty-audio-mp3", k: "s4" },
+      { t: "bhanudisahaj-mp3",      k: "s5" },
+    ],
+  },
+];
+
 /* ================================================================== */
 
 const STORE_KEY = "kriya-store";
@@ -131,8 +159,11 @@ export default function App() {
     (async () => {
       const d = await loadStore();
       if (!alive) return;
+      let seq = d && Array.isArray(d.sequences) ? d.sequences : [];
+      const missing = DEFAULT_SEQUENCES.filter((ds) => !seq.some((s) => s.id === ds.id));
+      if (missing.length) seq = [...seq, ...missing];
+      setSequences(seq);
       if (d) {
-        setSequences(Array.isArray(d.sequences) ? d.sequences : []);
         setDurations(d.durations || {});
         if (d.teacher && TEACHERS.includes(d.teacher)) setTeacher(d.teacher);
       }
@@ -238,7 +269,9 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
     <button key={t.id} className="k-card k-row" onClick={() => onPlayTrack(t, label || t.name)}>
       <span>
         <span className="k-display k-rowname">{label || t.name || t.practice}</span>
-        {t.variant && <span className="k-tag">{t.variant}</span>}
+        {teacher === "General"
+          ? (tagOf(t) && <span className="k-tag">{tagOf(t)}</span>)
+          : (t.variant && <span className="k-tag">{t.variant}</span>)}
         <span className="k-sub k-mono k-small">{durations[t.id] ? fmtLong(durations[t.id]) : "—"}</span>
       </span>
       <span className="k-play" aria-hidden="true" />
