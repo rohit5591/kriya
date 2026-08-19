@@ -45,7 +45,7 @@ const STORE_KEY = "kriya-store";
 const PAUSE_CHOICES = [5, 10, 15, 30, 60, 120, 300];
 
 /* true when you host this yourself; localStorage is blocked in Claude */
-const USE_LOCAL_STORAGE = false;
+const USE_LOCAL_STORAGE = true;
 
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const urlFor = (file) => BASE + encodeURIComponent(file);
