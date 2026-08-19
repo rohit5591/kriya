@@ -712,6 +712,11 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
         )}
       </div>
 
+      <div className="k-progress" role="progressbar" aria-label="Playback progress"
+        aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+        <div className="k-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+
       {seq.steps.length > 1 && (
         <div className="k-thread k-thread-lg">
           {seq.steps.map((st, i) => (
@@ -845,6 +850,10 @@ function Styles() {
   align-items:center; justify-content:center; gap:4px; }
 .k-time { font-size:32px; }
 .k-nowplaying { font-size:27px; margin-bottom:8px; }
+.k-progress { width:100%; max-width:320px; height:5px; margin:20px auto 0;
+  border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
+.k-progress-fill { height:100%; background:var(--amber); border-radius:999px;
+  transition:width .3s linear; }
 .k-controls { display:flex; align-items:center; justify-content:center; gap:26px; margin-top:auto; padding-top:24px; }
 .k-circle { width:58px; height:58px; border-radius:50%; border:1px solid var(--line);
   background:rgba(255,255,255,.04); color:var(--sandal); font-size:24px; cursor:pointer; }
@@ -862,7 +871,7 @@ function Styles() {
 button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
 @media (prefers-reduced-motion: reduce) {
   .k-fade, .k-breathe { animation:none; }
-  .k-bead, .k-ring-fill { transition:none; }
+  .k-bead, .k-ring-fill, .k-progress-fill { transition:none; }
 }
 `}</style>
   );
