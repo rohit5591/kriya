@@ -37,7 +37,10 @@ const FULL = [
   { name: "Fast Kriya",                              variant: "Annales", file: "Fast Kriya - Annales.mp3" },
 ];
 
-const TEACHERS = ["Vishal", "Kashi Bhai", "Dinesh", "Mayur Karthik", "Bhanu Di"];
+const TEACHERS = ["General", "Vishal", "Kashi Bhai", "Dinesh", "Mayur Karthik", "Bhanu Di"];
+
+/* Full kriyas shown under the General tab, regardless of who teaches them. */
+const GENERAL_FILES = ["Fast Kriya - Annales.mp3", "Dinesh-Kriya.mp3"];
 
 /* ================================================================== */
 
@@ -58,7 +61,7 @@ const PATH_TRACKS = FULL.map((f) => ({
 }));
 const ALL = [...LIBRARY, ...PATH_TRACKS];
 const PRACTICES = [...new Set(LIBRARY.map((t) => t.practice))];
-const SHARED_FULL = PATH_TRACKS.filter((t) => !t.teacher);
+const SHARED_FULL = PATH_TRACKS.filter((t) => !t.teacher && !GENERAL_FILES.includes(t.file));
 
 /* ---------------------------- storage ----------------------------- */
 /* { sequences: [...], teacher: "Vishal", durations: { id: seconds } } */
@@ -226,8 +229,10 @@ export default function App() {
 function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
                 onPlayTrack, onPlaySeq, onEdit, onNew, onLibrary }) {
 
-  const theirFull = PATH_TRACKS.filter((t) => t.teacher === teacher);
-  const theirSolo = LIBRARY.filter((t) => t.teacher === teacher);
+  const theirFull = teacher === "General"
+    ? PATH_TRACKS.filter((t) => GENERAL_FILES.includes(t.file))
+    : PATH_TRACKS.filter((t) => t.teacher === teacher);
+  const theirSolo = teacher === "General" ? [] : LIBRARY.filter((t) => t.teacher === teacher);
 
   const row = (t, label) => (
     <button key={t.id} className="k-card k-row" onClick={() => onPlayTrack(t, label || t.name)}>
