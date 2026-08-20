@@ -270,6 +270,8 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
     ? PATH_TRACKS.filter((t) => GENERAL_FILES.includes(t.file))
     : PATH_TRACKS.filter((t) => t.teacher === teacher);
   const theirSolo = teacher === "General" ? [] : LIBRARY.filter((t) => t.teacher === teacher);
+  const generalSequences = teacher === "General" ? sequences.filter((s) => s.locked) : [];
+  const myKriyas = sequences.filter((s) => !s.locked);
 
   const row = (t, label) => (
     <button key={t.id} className="k-card k-row" onClick={() => onPlayTrack(t, label || t.name)}>
@@ -283,6 +285,19 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
       <span className="k-play" aria-hidden="true" />
     </button>
   );
+
+  const seqRow = (s) => {
+    const d = seqDuration(s);
+    return (
+      <button key={s.id} className="k-card k-row" onClick={() => onPlaySeq(s)}>
+        <span>
+          <span className="k-display k-rowname">{s.name}</span>
+          <span className="k-sub k-mono k-small">{d ? fmtLong(d) : "—"}</span>
+        </span>
+        <span className="k-play" aria-hidden="true" />
+      </button>
+    );
+  };
 
   return (
     <div className="k-fade">
@@ -304,10 +319,13 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
         </div>
       </div>
 
-      {theirFull.length > 0 && (
+      {(theirFull.length > 0 || generalSequences.length > 0) && (
         <>
           <div className="k-eyebrow k-mt">Full kriyas</div>
-          <div className="k-list k-mt-s">{theirFull.map((t) => row(t))}</div>
+          <div className="k-list k-mt-s">
+            {theirFull.map((t) => row(t))}
+            {generalSequences.map((s) => seqRow(s))}
+          </div>
         </>
       )}
 
@@ -330,14 +348,14 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
         <button className="k-ghost" onClick={onNew}>+ New</button>
       </div>
 
-      {sequences.length === 0 ? (
+      {myKriyas.length === 0 ? (
         <p className="k-sub">
           Nothing built yet. String the practices together — a short one for
           weekday mornings, a long one for Sundays.
         </p>
       ) : (
         <div className="k-list k-mt-s">
-          {sequences.map((s) => {
+          {myKriyas.map((s) => {
             const d = seqDuration(s);
             return (
               <div key={s.id} className="k-card k-seqcard">
