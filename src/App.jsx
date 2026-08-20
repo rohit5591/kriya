@@ -42,6 +42,14 @@ const TEACHERS = ["General", "Vishal", "Kashi Bhai", "Dinesh", "Mayur Karthik", 
 /* Full kriyas shown under the General tab, regardless of who teaches them. */
 const GENERAL_FILES = ["Fast Kriya - Annales.mp3", "Dinesh-Kriya.mp3"];
 
+/* Backdrop — one of these is picked at random each time the app loads. */
+const PHOTOS = [
+  "images1.jpg", "images2.jpg", "images3.jpg", "images4.jpg", "images5.jpg",
+  "images6.jpg", "images7.jpg", "images8.jpg", "images9.jpg",
+];
+const photoUrl = (f) => `${import.meta.env.BASE_URL}gurudev/${encodeURIComponent(f)}`;
+const LOGO_URL = `${import.meta.env.BASE_URL}aol-logo.webp`;
+
 /* Pre-built kriyas, backfilled into "My kriyas" if missing by id
    (won't duplicate or reappear-fight a deliberate edit to the same id). */
 const DEFAULT_SEQUENCES = [
@@ -152,6 +160,10 @@ export default function App() {
   const [playing, setPlaying] = useState(null);
   const [toast, setToast] = useState(null);
 
+  /* lazy initialiser, so the backdrop is drawn once per load and then
+     stays put — re-rolling it on every render would flicker */
+  const [photo] = useState(() => PHOTOS[Math.floor(Math.random() * PHOTOS.length)]);
+
   const audioA = useRef(null);
   const audioB = useRef(null);
   const trackById = (id) => ALL.find((t) => t.id === id);
@@ -188,19 +200,59 @@ export default function App() {
     return () => clearTimeout(id);
   }, [sequences, teacher, durations, loaded]);
 
-  /* read lengths once, cache them */
+  /* Read lengths once, cache them. Probed a few at a time rather than all
+     at once — opening ~20 <audio> elements simultaneously is enough for
+     mobile Safari to quietly drop some of them, which is what leaves a
+     dash where a length should be. */
   useEffect(() => {
     if (!loaded) return;
+    let alive = true;
+
+    /* one recording can back several entries (Fast Kriya is both a practice
+       and a full kriya), so fetch per unique file and fan the answer out */
+    const byUrl = new Map();
     ALL.forEach((t) => {
       if (durations[t.id]) return;
-      const probe = document.createElement("audio");
-      probe.preload = "metadata";
-      probe.src = t.url;
-      probe.onloadedmetadata = () => {
-        if (isFinite(probe.duration))
-          setDurations((prev) => ({ ...prev, [t.id]: probe.duration }));
-      };
+      if (!byUrl.has(t.url)) byUrl.set(t.url, []);
+      byUrl.get(t.url).push(t.id);
     });
+    const queue = [...byUrl.entries()];
+
+    const probeOne = (url) => new Promise((resolve) => {
+      const probe = document.createElement("audio");
+      let timer;
+      const finish = (v) => {
+        clearTimeout(timer);
+        probe.onloadedmetadata = probe.onerror = null;
+        probe.removeAttribute("src");
+        probe.load(); /* let go of the connection instead of leaving it open */
+        resolve(v);
+      };
+      probe.preload = "metadata";
+      probe.onloadedmetadata = () => finish(isFinite(probe.duration) ? probe.duration : null);
+      probe.onerror = () => finish(null);
+      /* don't let one stuck file block the rest of the queue forever */
+      timer = setTimeout(() => finish(null), 20000);
+      probe.src = url;
+    });
+
+    const worker = async () => {
+      while (alive) {
+        const item = queue.shift();
+        if (!item) return;
+        const [url, ids] = item;
+        const secs = await probeOne(url);
+        if (!alive || secs == null) continue;
+        setDurations((prev) => {
+          const next = { ...prev };
+          ids.forEach((id) => { next[id] = secs; });
+          return next;
+        });
+      }
+    };
+    for (let i = 0; i < 3; i++) worker();
+
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
@@ -212,7 +264,7 @@ export default function App() {
   };
 
   return (
-    <div className="k-root">
+    <div className="k-root" style={{ "--bg-photo": `url("${photoUrl(photo)}")` }}>
       <Styles />
       <audio ref={audioA} preload="auto" />
       <audio ref={audioB} preload="auto" />
@@ -303,9 +355,12 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
   return (
     <div className="k-fade">
       <header className="k-head">
-        <div>
-          <div className="k-eyebrow">Sadhana</div>
-          <h1 className="k-display k-h1">Sudarshan Kriya</h1>
+        <div className="k-brand">
+          <img className="k-logo" src={LOGO_URL} alt="The Art of Living" />
+          <div>
+            <div className="k-eyebrow">Sadhana</div>
+            <h1 className="k-display k-h1">Sudarshan Kriya</h1>
+          </div>
         </div>
         <button className="k-ghost" onClick={onLibrary}>Recordings</button>
       </header>
@@ -797,6 +852,21 @@ function Styles() {
   background:radial-gradient(130% 70% at 50% -15%, #1D2436 0%, #0D1018 62%);
   color:var(--sandal); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   -webkit-font-smoothing:antialiased;
+  position:relative; isolation:isolate;
+}
+/* Gurudev backdrop — a dim, full-screen presence rather than a hero crop.
+   The photos vary a lot in framing, so anything that crops tight is a
+   lottery; keeping it faint and full-bleed reads well whichever one comes
+   up, and leaves every bit of text its contrast. --bg-photo set per load. */
+.k-root::before {
+  content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background-image:
+    linear-gradient(180deg, rgba(13,16,24,.84) 0%, rgba(13,16,24,.88) 45%, rgba(13,16,24,.93) 100%),
+    var(--bg-photo, none);
+  background-size:cover, cover;
+  background-position:center, center 18%;
+  background-repeat:no-repeat, no-repeat;
+  filter:saturate(.75);
 }
 .k-display { font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif; }
 .k-mono { font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; }
@@ -806,6 +876,13 @@ function Styles() {
 .k-dim { color:var(--muted); } .k-small { font-size:11px; }
 .k-mt { margin-top:24px; } .k-mt-s { margin-top:10px; } .k-center { text-align:center; }
 .k-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
+.k-brand { display:flex; align-items:center; gap:11px; min-width:0; }
+/* the logo artwork is dark on a transparent ground, so it needs
+   flattening to white to read against this theme */
+.k-logo { width:38px; height:auto; flex:none; filter:brightness(0) invert(1); opacity:.9; }
+/* smaller than the standalone .k-h1 so logo + title + Recordings still
+   fit one line on a ~360px phone */
+.k-brand .k-h1 { font-size:25px; line-height:1.15; }
 .k-headrow { display:flex; align-items:center; justify-content:space-between; gap:10px; }
 
 .k-teacherbar { border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:12px 0; }
