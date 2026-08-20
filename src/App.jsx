@@ -48,6 +48,7 @@ const DEFAULT_SEQUENCES = [
   {
     id: "advanced-kriya-with-yoga",
     name: "Advanced Kriya with Yoga",
+    locked: true,
     steps: [
       { t: "mayur-karthik-padmasadhana-mp3", k: "s1" },
       { t: "3-stage-dinesh-mp3",             k: "s2" },
@@ -60,6 +61,7 @@ const DEFAULT_SEQUENCES = [
   {
     id: "advanced-kriya-no-yoga",
     name: "Advanced Kriya no Yoga",
+    locked: true,
     steps: [
       { t: "3-stage-dinesh-mp3",    k: "s1" },
       { t: "bhastrika-dinesh-mp3",  k: "s2" },
@@ -160,6 +162,10 @@ export default function App() {
       const d = await loadStore();
       if (!alive) return;
       let seq = d && Array.isArray(d.sequences) ? d.sequences : [];
+      /* re-sync any saved copy back to the canonical preset (covers users who
+         got these backfilled before "locked" existed, and keeps presets
+         un-editable even if a saved copy somehow drifted) */
+      seq = seq.map((s) => DEFAULT_SEQUENCES.find((ds) => ds.id === s.id) || s);
       const missing = DEFAULT_SEQUENCES.filter((ds) => !seq.some((s) => s.id === ds.id));
       if (missing.length) seq = [...seq, ...missing];
       setSequences(seq);
@@ -349,7 +355,9 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
                   </div>
                   <span className="k-play" aria-hidden="true" />
                 </button>
-                <button className="k-edit" onClick={() => onEdit(s)}>Edit</button>
+                {s.locked
+                  ? <div className="k-edit k-edit-locked">Preset</div>
+                  : <button className="k-edit" onClick={() => onEdit(s)}>Edit</button>}
               </div>
             );
           })}
@@ -797,6 +805,7 @@ function Styles() {
   background:none; border:0; color:inherit; text-align:left; padding:16px 16px 12px; cursor:pointer; }
 .k-edit { width:100%; background:rgba(255,255,255,.03); border:0; border-top:1px solid var(--line);
   color:var(--muted); padding:11px; font-size:12px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer; }
+.k-edit-locked { cursor:default; opacity:.55; text-align:center; }
 
 .k-tag { font-size:12px; letter-spacing:.08em; color:var(--sage); background:rgba(127,179,166,.1);
   border:1px solid rgba(127,179,166,.25); border-radius:999px; padding:3px 10px; display:inline-block; }
