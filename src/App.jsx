@@ -699,13 +699,6 @@ function Home({ cat, teacher, setTeacher, sequences, seqDuration, durations, can
     : cat.pathTracks.filter((t) => t.teacher === teacher);
   const theirSolo = teacher === "General" ? [] : cat.library.filter((t) => t.teacher === teacher);
   const generalSequences = teacher === "General" ? sequences.filter((s) => s.locked) : [];
-  /* The practices, one row per practice, on the General tab. Without
-     this the teacher-less ones — Mudra, Bhogar, the bells, Samaveda —
-     live only under Recordings, so being granted Part 2 or Sanyam 2
-     changes nothing you can see from the home screen. */
-  const generalPractices = teacher === "General"
-    ? cat.practices.map((name) => cat.library.find((t) => t.practice === name)).filter(Boolean)
-    : [];
   const myKriyas = sequences.filter((s) => !s.locked);
 
   const row = (t, label) => (
@@ -774,15 +767,6 @@ function Home({ cat, teacher, setTeacher, sequences, seqDuration, durations, can
         <>
           <div className="k-eyebrow k-mt">{teacher}</div>
           <div className="k-list k-mt-s">{theirSolo.map((t) => row(t, t.practice))}</div>
-        </>
-      )}
-
-      {generalPractices.length > 0 && (
-        <>
-          <div className="k-eyebrow k-mt">Practices</div>
-          <div className="k-list k-mt-s">
-            {generalPractices.map((t) => row(t, t.practice))}
-          </div>
         </>
       )}
 
