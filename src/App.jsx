@@ -264,7 +264,8 @@ export default function App() {
   };
 
   return (
-    <div className="k-root" style={{ "--bg-photo": `url("${photoUrl(photo)}")` }}>
+    <div className={view === "play" ? "k-root k-root-photo" : "k-root"}
+         style={{ "--bg-photo": `url("${photoUrl(photo)}")` }}>
       <Styles />
       <audio ref={audioA} preload="auto" />
       <audio ref={audioB} preload="auto" />
@@ -759,11 +760,11 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
   };
 
   const pct = total ? Math.min(100, (elapsed / total) * 100) : 0;
-  const R = 86, C = 2 * Math.PI * R;
+  const left = total ? Math.max(0, total - elapsed) : null;
 
   if (done) {
     return (
-      <div className="k-fade k-center k-player">
+      <div className="k-fade k-center k-player k-player-done">
         <div className="k-eyebrow">{seq.name}</div>
         <h2 className="k-display k-h1 k-mt">Complete</h2>
         <p className="k-sub">Sit for as long as you like.</p>
@@ -772,70 +773,76 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
     );
   }
 
-  const tag = step.p ? "" : track ? tagOf(track) : "";
+  const title = step.p ? "Silence" : track ? track.practice : "—";
+  /* the meta line under the title: teacher as a pill, then length and
+     what kind of recording this is — the same facts the home rows show,
+     laid out for a screen you look at from across the room */
+  const kind = step.p ? "Silence"
+    : track ? (track.variant || (track.kind === "full" ? "Full kriya" : "Guided")) : "";
+  const meta = [total ? fmtLong(total) : "", kind].filter(Boolean).join("  ·  ");
 
   return (
     <div className="k-fade k-player">
-      <header className="k-head">
+      <header className="k-head k-playhead">
         <button className="k-ghost" onClick={onExit}>Close</button>
         <div className="k-eyebrow">{seq.name}</div>
       </header>
 
-      <div className="k-ring-wrap">
-        <svg viewBox="0 0 200 200" className={isPlaying ? "k-ring k-breathe" : "k-ring"}>
-          <circle cx="100" cy="100" r={R} className="k-ring-track" />
-          <circle cx="100" cy="100" r={R} className="k-ring-fill"
-            strokeDasharray={C} strokeDashoffset={C - (C * pct) / 100} />
-        </svg>
-        <div className="k-ring-inner">
-          <div className="k-mono k-time">{fmt(elapsed)}</div>
-          <div className="k-mono k-dim k-small">{total ? `of ${fmt(total)}` : ""}</div>
+      {/* the photo shows through here — the panel below carries everything */}
+      <div className="k-stage" aria-hidden="true" />
+
+      <section className="k-panel">
+        <h2 className="k-display k-panel-title">{title}</h2>
+
+        <div className="k-metarow">
+          {!step.p && track && track.teacher && <span className="k-tag">{track.teacher}</span>}
+          {meta && <span className="k-meta">{meta}</span>}
         </div>
-      </div>
 
-      <div className="k-center">
-        <div className="k-display k-nowplaying">
-          {step.p ? "Silence" : track ? track.practice : "—"}
-          {isPlaying && <span className="k-livebars" aria-hidden="true"><span /><span /><span /></span>}
+        <input
+          className="k-progress" type="range" aria-label="Playback progress"
+          min={0} max={total || 0} step={0.1}
+          value={Math.min(elapsed, total || 0)}
+          disabled={!total}
+          onChange={(e) => seek(Number(e.target.value))}
+          style={{ "--pct": `${pct}%` }}
+        />
+
+        <div className="k-timerow k-mono">
+          <span>{fmt(elapsed)}</span>
+          <span className="k-dim">{left == null ? "" : `-${fmt(left)}`}</span>
         </div>
-        {tag && <div className="k-tag k-tag-lg">{tag}</div>}
-        {seq.steps.length > 1 && (
-          <div className="k-eyebrow k-mt-s">step {index + 1} of {seq.steps.length}</div>
-        )}
-      </div>
 
-      <input
-        className="k-progress" type="range" aria-label="Playback progress"
-        min={0} max={total || 0} step={0.1}
-        value={Math.min(elapsed, total || 0)}
-        disabled={!total}
-        onChange={(e) => seek(Number(e.target.value))}
-        style={{ "--pct": `${pct}%` }}
-      />
+        {status === "loading" && <p className="k-note">Loading…</p>}
+        {status === "blocked" && <p className="k-note k-warn">Tap play to continue.</p>}
+        {status === "error" && <p className="k-note k-warn">This recording wouldn’t load. Check the link, or skip ahead.</p>}
 
-      {seq.steps.length > 1 && (
-        <div className="k-thread k-thread-lg">
-          {seq.steps.map((st, i) => (
-            <span key={st.k || i}
-              className={(st.p ? "k-bead k-bead-sm" : "k-bead") +
-                (i === index ? " k-bead-on" : i < index ? " k-bead-past" : "")} />
-          ))}
-        </div>
-      )}
-
-      {status === "loading" && <p className="k-sub k-center">Loading…</p>}
-      {status === "blocked" && <p className="k-warn k-center">Tap play to continue.</p>}
-      {status === "error" && <p className="k-warn k-center">This recording wouldn’t load. Check the link, or skip ahead.</p>}
-
-      <div className="k-controls">
-        <button className="k-circle" onClick={() => skip(-1)} aria-label="Previous">‹</button>
-        <span className={isPlaying ? "k-bigwrap k-bigwrap-playing" : "k-bigwrap"}>
-          <button className="k-circle k-big" onClick={toggle} aria-label={isPlaying ? "Pause" : "Play"}>
-            {isPlaying ? "❙❙" : "▶"}
+        <div className="k-controls">
+          <button className="k-circle" onClick={() => skip(-1)} aria-label="Previous">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
           </button>
-        </span>
-        <button className="k-circle" onClick={() => skip(1)} aria-label="Next">›</button>
-      </div>
+          <span className={isPlaying ? "k-bigwrap k-bigwrap-playing" : "k-bigwrap"}>
+            <button className="k-circle k-big" onClick={toggle} aria-label={isPlaying ? "Pause" : "Play"}>
+              {isPlaying
+                ? <svg viewBox="0 0 24 24" className="k-glyph" aria-hidden="true"><rect x="7" y="5" width="3.6" height="14" rx="1.2" /><rect x="13.4" y="5" width="3.6" height="14" rx="1.2" /></svg>
+                : <svg viewBox="0 0 24 24" className="k-glyph" aria-hidden="true"><path d="M8.5 5.4 18.5 12l-10 6.6z" /></svg>}
+            </button>
+          </span>
+          <button className="k-circle" onClick={() => skip(1)} aria-label="Next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+
+        {seq.steps.length > 1 && (
+          <div className="k-thread k-thread-lg">
+            {seq.steps.map((st, i) => (
+              <span key={st.k || i}
+                className={(st.p ? "k-bead k-bead-sm" : "k-bead") +
+                  (i === index ? " k-bead-on" : i < index ? " k-bead-past" : "")} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -859,7 +866,7 @@ function Styles() {
      glyphs. Cards are opaque, so they opt out below. */
   text-shadow:0 1px 3px rgba(6,8,14,.9), 0 2px 14px rgba(6,8,14,.8);
 }
-.k-card, .k-teacher-on, .k-primary, .k-big { text-shadow:none; }
+.k-card, .k-teacher-on, .k-primary, .k-big, .k-panel { text-shadow:none; }
 /* Gurudev backdrop — a full-screen presence behind the app.
    The photos vary a lot in framing, so anything that crops tight is a
    lottery; full-bleed reads well whichever one comes up. --bg-photo is
@@ -882,6 +889,21 @@ function Styles() {
   background-position:center, center 16%;
   background-repeat:no-repeat, no-repeat;
   filter:saturate(.92);
+}
+/* In the player the photo IS the screen rather than a backdrop, so the
+   veil pulls right back: just enough at the top edge to hold the header,
+   and nothing much in the middle. The control panel below is opaque, so
+   the bottom of the photo needs no help at all. */
+.k-root-photo::before {
+  background-image:
+    linear-gradient(180deg,
+      rgba(13,16,24,.60) 0%,
+      rgba(13,16,24,.20) 18%,
+      rgba(13,16,24,.04) 46%,
+      rgba(13,16,24,.20) 80%,
+      rgba(13,16,24,.40) 100%),
+    var(--bg-photo, none);
+  filter:none;
 }
 .k-display { font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif; }
 .k-mono { font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; }
@@ -923,11 +945,10 @@ function Styles() {
 
 .k-tag { font-size:12px; letter-spacing:.08em; color:var(--sage); background:rgba(127,179,166,.1);
   border:1px solid rgba(127,179,166,.25); border-radius:999px; padding:3px 10px; display:inline-block; }
-.k-tag-lg { font-size:13px; margin-top:2px; }
 .k-file { display:block; margin-top:5px; opacity:.6; word-break:break-all; }
 
 .k-thread { display:flex; align-items:center; gap:7px; margin-top:12px; flex-wrap:wrap; }
-.k-thread-lg { justify-content:center; gap:10px; margin:24px 0; }
+.k-thread-lg { justify-content:center; gap:10px; margin:22px 0 0; }
 .k-bead { width:11px; height:11px; border-radius:50%; background:var(--slate);
   border:1px solid var(--line); flex:none; transition:all .4s ease; }
 .k-bead-sm { width:5px; height:5px; background:transparent; border-color:var(--muted); }
@@ -976,51 +997,67 @@ function Styles() {
 .k-verleft { min-width:0; }
 .k-verright { display:flex; align-items:center; gap:12px; flex:none; }
 
-.k-player { display:flex; flex-direction:column; min-height:88vh; min-height:88svh; }
-.k-ring-wrap { position:relative; width:230px; height:230px; margin:14px auto 6px; }
-.k-ring { width:100%; height:100%; transform:rotate(-90deg); }
-/* these thin tracks used to be near-invisible once a bright photo sat
-   behind them, so they carry a little more weight now */
-.k-ring-track { fill:none; stroke:rgba(255,255,255,.2); stroke-width:6; }
-.k-ring-fill { fill:none; stroke:var(--amber); stroke-width:6; stroke-linecap:round;
-  transition:stroke-dashoffset .3s linear; filter:drop-shadow(0 0 8px rgba(233,169,74,.35)); }
-.k-ring-inner { position:absolute; inset:0; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; gap:4px; }
-.k-time { font-size:32px; }
-.k-nowplaying { font-size:27px; margin-bottom:8px; }
-.k-livebars { display:inline-flex; align-items:flex-end; gap:3px; height:16px; margin-left:9px;
-  vertical-align:middle; }
-.k-livebars span { width:3px; background:var(--amber); border-radius:1px;
-  animation:klivebar 0.9s ease-in-out infinite; }
-.k-livebars span:nth-child(1) { animation-delay:0s; }
-.k-livebars span:nth-child(2) { animation-delay:0.2s; }
-.k-livebars span:nth-child(3) { animation-delay:0.4s; }
-@keyframes klivebar { 0%, 100% { height:4px; } 50% { height:16px; } }
+/* ------------------------------- player --------------------------- */
+/* The player is a photo with a control panel resting on the bottom of
+   it: header floats on the image, the stage is empty on purpose (that
+   is the photo), and everything you touch lives in the panel. */
+.k-player { display:flex; flex-direction:column; min-height:calc(100vh - 62px);
+  min-height:calc(100svh - 62px); }
+.k-player-done { min-height:88svh; }
+.k-playhead { margin-bottom:0; }
+.k-stage { flex:1; min-height:90px; }
+
+.k-panel { text-shadow:none; text-align:center;
+  /* bleeds through the root's padding so it sits on the bottom edge */
+  margin:18px -18px -40px;
+  padding:26px 22px calc(26px + env(safe-area-inset-bottom, 0px));
+  border-radius:26px 26px 0 0;
+  border:1px solid rgba(255,255,255,.07); border-bottom:0;
+  background:linear-gradient(180deg, rgba(15,19,29,.93) 0%, rgba(10,13,20,.97) 100%);
+  -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px);
+  box-shadow:0 -26px 60px rgba(6,8,14,.5); }
+.k-panel-title { font-size:38px; font-weight:500; line-height:1.1; margin:0; }
+.k-metarow { display:flex; align-items:center; justify-content:center;
+  gap:12px; flex-wrap:wrap; margin-top:14px; }
+.k-meta { font-size:12.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+
 .k-progress { -webkit-appearance:none; appearance:none; display:block;
-  width:100%; max-width:320px; height:20px; margin:20px auto 0; background:transparent; cursor:pointer; }
+  width:100%; height:20px; margin:22px auto 0; background:transparent; cursor:pointer; }
 .k-progress:disabled { cursor:default; opacity:.4; }
-.k-progress::-webkit-slider-runnable-track { height:5px; border-radius:999px;
-  background:linear-gradient(to right, var(--amber) var(--pct), rgba(255,255,255,.2) var(--pct)); }
+.k-progress::-webkit-slider-runnable-track { height:4px; border-radius:999px;
+  background:linear-gradient(to right, var(--amber) var(--pct), rgba(255,255,255,.22) var(--pct)); }
 .k-progress::-webkit-slider-thumb { -webkit-appearance:none; appearance:none;
-  width:14px; height:14px; margin-top:-4.5px; border-radius:50%; background:var(--amber);
-  box-shadow:0 0 6px rgba(233,169,74,.5); }
-.k-progress::-moz-range-track { height:5px; border-radius:999px; background:rgba(255,255,255,.2); }
-.k-progress::-moz-range-progress { height:5px; border-radius:999px; background:var(--amber); }
-.k-progress::-moz-range-thumb { width:14px; height:14px; border-radius:50%; border:none;
-  background:var(--amber); box-shadow:0 0 6px rgba(233,169,74,.5); }
-.k-controls { display:flex; align-items:center; justify-content:center; gap:26px; margin-top:auto; padding-top:24px; }
-.k-circle { width:58px; height:58px; border-radius:50%; border:1px solid var(--line);
-  background:rgba(255,255,255,.04); color:var(--sandal); font-size:24px; cursor:pointer; }
-.k-big { width:82px; height:82px; background:var(--amber); border-color:var(--amber); color:#12151F; }
+  width:13px; height:13px; margin-top:-4.5px; border-radius:50%; background:#fff;
+  box-shadow:0 1px 5px rgba(0,0,0,.5); }
+.k-progress::-moz-range-track { height:4px; border-radius:999px; background:rgba(255,255,255,.22); }
+.k-progress::-moz-range-progress { height:4px; border-radius:999px; background:var(--amber); }
+.k-progress::-moz-range-thumb { width:13px; height:13px; border-radius:50%; border:none;
+  background:#fff; box-shadow:0 1px 5px rgba(0,0,0,.5); }
+.k-timerow { display:flex; justify-content:space-between; align-items:baseline;
+  font-size:15px; margin-top:-2px; }
+.k-note { font-size:13px; color:var(--muted); margin:12px 0 0; }
+.k-note.k-warn { color:#D9A05B; }
+
+.k-controls { display:flex; align-items:center; justify-content:center; gap:30px; margin-top:20px; }
+.k-circle { width:60px; height:60px; border-radius:50%; border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05); color:var(--sandal); cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; padding:0; }
+.k-circle svg { width:24px; height:24px; fill:none; stroke:currentColor;
+  stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+.k-big { width:88px; height:88px; background:var(--amber); border-color:var(--amber); color:#12151F;
+  box-shadow:0 10px 30px rgba(233,169,74,.28); }
+.k-big .k-glyph { width:30px; height:30px; fill:currentColor; stroke:none; }
 .k-bigwrap { position:relative; display:inline-flex; }
-.k-bigwrap-playing::before, .k-bigwrap-playing::after {
+/* a fixed hairline ring, plus the two expanding rings while playing */
+.k-bigwrap::before { content:""; position:absolute; inset:-7px; border-radius:50%;
+  border:2px solid rgba(233,169,74,.5); pointer-events:none; }
+.k-bigwrap-playing::after {
   content:""; position:absolute; inset:0; border-radius:50%; border:2px solid var(--amber);
-  animation:kplaypulse 1.8s ease-out infinite; pointer-events:none;
+  animation:kplaypulse 2.2s ease-out infinite; pointer-events:none;
 }
-.k-bigwrap-playing::after { animation-delay:0.9s; }
 @keyframes kplaypulse {
-  0% { transform:scale(1); opacity:.7; }
-  100% { transform:scale(1.7); opacity:0; }
+  0% { transform:scale(1); opacity:.65; }
+  100% { transform:scale(1.6); opacity:0; }
 }
 
 .k-toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
@@ -1030,27 +1067,26 @@ function Styles() {
 
 .k-fade { animation:kfade .5s ease both; }
 @keyframes kfade { from { opacity:0; transform:translateY(8px);} to { opacity:1; transform:none;} }
-.k-breathe { animation:kbreathe 8s ease-in-out infinite; }
-@keyframes kbreathe { 0%,100% { transform:rotate(-90deg) scale(1);} 50% { transform:rotate(-90deg) scale(1.035);} }
 button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
 @media (prefers-reduced-motion: reduce) {
-  .k-fade, .k-breathe { animation:none; }
-  .k-bead, .k-ring-fill { transition:none; }
-  .k-bigwrap-playing::before, .k-bigwrap-playing::after { animation:none; content:none; }
-  .k-livebars span { animation:none; height:10px; }
+  .k-fade { animation:none; }
+  .k-bead { transition:none; }
+  .k-bigwrap-playing::after { animation:none; content:none; }
 }
-/* short viewports (landscape phones, small windows) — compact the player
-   so its fixed-size ring and spacing don't force a scrollbar */
+/* short viewports (landscape phones, small windows) — compact the panel
+   so its controls and spacing don't force a scrollbar */
 @media (max-height: 700px) {
   .k-head { margin-bottom:12px; }
-  .k-ring-wrap { width:170px; height:170px; margin:8px auto 4px; }
-  .k-time { font-size:24px; }
-  .k-nowplaying { font-size:22px; margin-bottom:6px; }
+  .k-stage { min-height:40px; }
+  .k-panel { margin-top:10px; padding-top:18px; }
+  .k-panel-title { font-size:29px; }
+  .k-metarow { margin-top:10px; }
   .k-progress { margin-top:12px; }
-  .k-thread-lg { margin:14px 0; gap:8px; }
-  .k-controls { gap:20px; padding-top:14px; }
-  .k-circle { width:50px; height:50px; }
-  .k-big { width:70px; height:70px; }
+  .k-thread-lg { margin:14px 0 0; gap:8px; }
+  .k-controls { gap:22px; margin-top:14px; }
+  .k-circle { width:52px; height:52px; }
+  .k-big { width:72px; height:72px; }
+  .k-big .k-glyph { width:26px; height:26px; }
 }
 `}</style>
   );
