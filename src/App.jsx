@@ -773,7 +773,8 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
 
       <div className="k-controls">
         <button className="k-circle" onClick={() => skip(-1)} aria-label="Previous">‹</button>
-        <button className="k-circle k-big" onClick={toggle} aria-label={isPlaying ? "Pause" : "Play"}>
+        <button className={isPlaying ? "k-circle k-big k-big-playing" : "k-circle k-big"}
+          onClick={toggle} aria-label={isPlaying ? "Pause" : "Play"}>
           {isPlaying ? "❙❙" : "▶"}
         </button>
         <button className="k-circle" onClick={() => skip(1)} aria-label="Next">›</button>
@@ -906,7 +907,16 @@ function Styles() {
 .k-controls { display:flex; align-items:center; justify-content:center; gap:26px; margin-top:auto; padding-top:24px; }
 .k-circle { width:58px; height:58px; border-radius:50%; border:1px solid var(--line);
   background:rgba(255,255,255,.04); color:var(--sandal); font-size:24px; cursor:pointer; }
-.k-big { width:82px; height:82px; background:var(--amber); border-color:var(--amber); color:#12151F; }
+.k-big { width:82px; height:82px; background:var(--amber); border-color:var(--amber); color:#12151F; position:relative; }
+.k-big-playing::before, .k-big-playing::after {
+  content:""; position:absolute; inset:0; border-radius:50%; border:1.5px solid var(--amber);
+  animation:kplaypulse 2.2s ease-out infinite;
+}
+.k-big-playing::after { animation-delay:1.1s; }
+@keyframes kplaypulse {
+  0% { transform:scale(1); opacity:.7; }
+  100% { transform:scale(1.7); opacity:0; }
+}
 
 .k-toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
   background:#20293B; border:1px solid var(--line); color:var(--sandal);
@@ -921,6 +931,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:2px so
 @media (prefers-reduced-motion: reduce) {
   .k-fade, .k-breathe { animation:none; }
   .k-bead, .k-ring-fill { transition:none; }
+  .k-big-playing::before, .k-big-playing::after { animation:none; content:none; }
 }
 /* short viewports (landscape phones, small windows) — compact the player
    so its fixed-size ring and spacing don't force a scrollbar */
