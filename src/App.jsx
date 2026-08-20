@@ -1,46 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
+import {
+  COURSES, COURSE_IDS, GENERAL_FILES, buildCatalog, apiAudioUrl, courseName,
+} from "../shared/catalog.js";
+
 /* ==================================================================
-   SETUP — set BASE to the folder your 23 files sit in, ending with /
-   Filenames below match your folder exactly. Don't rename the files.
+   Two ways to run. Gated (the Cloudflare build) puts every recording
+   behind a sign-in and hands out only what someone has been taught.
+   Ungated (the plain static build) is the app as it was: the audio sits
+   in public/audio and everything is on show.
    ================================================================== */
 
-const BASE = `${import.meta.env.BASE_URL}audio/`;
-
-/* Building blocks — these are what you assemble custom kriyas from.
-   No teacher = the recording everyone uses.                          */
-const FILES = [
-  { practice: "Padmasadhana",    teacher: "Vishal",        file: "Vishal - Padmasadhana.mp3" },
-  { practice: "Padmasadhana",    teacher: "Mayur Karthik", file: "Mayur Karthik - Padmasadhana.mp3" },
-  { practice: "Bhogar Pranayam",                           file: "Bhogar Pranayam.mp3" },
-  { practice: "Mudra Pranayam",                            file: "Mudra Pranayams.mp3" },
-  { practice: "3 Stage",         teacher: "Dinesh",        file: "3-Stage - Dinesh.mp3" },
-  { practice: "Bhastrika",       teacher: "Dinesh",        file: "Bhastrika - Dinesh.mp3" },
-  { practice: "3 Stage + Bhastrika (Fast)", id: "fast-kriya-practice", file: "Fast Kriya - Annales.mp3" },
-  { practice: "Sanyam 2 Bells",                            file: "Sanyam 2 Bells.mp3" },
-  { practice: "Sahaj",           teacher: "Bhanu Di",      variant: "Regular", file: "BhanuDiSahaj.mp3" },
-  { practice: "Sahaj",           teacher: "Bhanu Di",      variant: "Trimmed", file: "BhanuDiSahaj-Trimmed.mp3" },
-  { practice: "Sahaj",                                     variant: "Silent",  file: "Sahaj Empty.mp3" },
-  { practice: "Samaveda",                                  variant: "Long",    file: "Samaveda - Long.mp3" },
-  { practice: "Samaveda",                                  variant: "Short",   file: "Samaveda - Short.mp3" },
-  { practice: "OM",              teacher: "Dinesh",        file: "OM - Dinesh.mp3" },
-  { practice: "Kriya",                                     variant: "Silent",  file: "Kriya - Empty Audio.mp3" },
-];
-
-/* Full kriyas — one recording, start to finish, one tap on the home screen. */
-const FULL = [
-  { name: "Regular Kriya",    teacher: "Dinesh",     file: "Dinesh-Kriya.mp3" },
-  { name: "Sanyam 2 Full",    teacher: "Vishal",     file: "Visham Sanyam 2 Full Refined.mp3" },
-  { name: "Sanyam 2 Evening", teacher: "Vishal",     file: "Vishal - Evening Sanyam 2 Refined.mp3" },
-  { name: "Sanyam 2 Full",    teacher: "Kashi Bhai", file: "Kashi Bhaiyya - Full Sanyam 2.mp3" },
-  { name: "Sanyam 2 Evening", teacher: "Kashi Bhai", file: "Kashi Bhaiyya - Sanyam 2 evening.mp3" },
-  { name: "Fast Kriya",                              variant: "Annales", file: "Fast Kriya - Annales.mp3" },
-];
-
-const TEACHERS = ["General", "Vishal", "Kashi Bhai", "Dinesh", "Mayur Karthik", "Bhanu Di"];
-
-/* Full kriyas shown under the General tab, regardless of who teaches them. */
-const GENERAL_FILES = ["Fast Kriya - Annales.mp3", "Dinesh-Kriya.mp3"];
+const GATED = import.meta.env.VITE_GATED === "true";
+const PUBLIC_AUDIO = `${import.meta.env.BASE_URL}audio/`;
+const publicAudioUrl = (t) => PUBLIC_AUDIO + encodeURIComponent(t.file);
+const trackUrl = GATED ? apiAudioUrl : publicAudioUrl;
 
 /* Backdrop — one of these is picked at random each time the app loads. */
 const PHOTOS = [
@@ -80,26 +54,11 @@ const DEFAULT_SEQUENCES = [
   },
 ];
 
-/* ================================================================== */
-
 const STORE_KEY = "kriya-store";
 const PAUSE_CHOICES = [5, 10, 15, 30, 60, 120, 300];
 
 /* true when you host this yourself; localStorage is blocked in Claude */
 const USE_LOCAL_STORAGE = true;
-
-const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-const urlFor = (file) => BASE + encodeURIComponent(file);
-
-const LIBRARY = FILES.map((f) => ({
-  ...f, id: f.id || slug(f.file), kind: "practice", url: urlFor(f.file),
-}));
-const PATH_TRACKS = FULL.map((f) => ({
-  ...f, practice: f.name, id: slug(f.file), kind: "full", url: urlFor(f.file),
-}));
-const ALL = [...LIBRARY, ...PATH_TRACKS];
-const PRACTICES = [...new Set(LIBRARY.map((t) => t.practice))];
-const SHARED_FULL = PATH_TRACKS.filter((t) => !t.teacher && !GENERAL_FILES.includes(t.file));
 
 /* ---------------------------- storage ----------------------------- */
 /* { sequences: [...], teacher: "Vishal", durations: { id: seconds } } */
@@ -149,7 +108,34 @@ const tagOf = (t) => [t.variant, t.teacher].filter(Boolean).join(" · ");
 /* ------------------------------ app ------------------------------- */
 
 export default function App() {
-  const [teacher, setTeacher] = useState(TEACHERS[0]);
+  /* Who is signed in, and what they were granted. Ungated, there is no
+     such thing: everyone gets everything, exactly as before. */
+  const [auth, setAuth] = useState(
+    GATED ? { state: "checking" } : { state: "open", grants: COURSE_IDS });
+
+  useEffect(() => {
+    if (!GATED) return;
+    let alive = true;
+    fetch("/api/me", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        setAuth(d.signedIn
+          ? { state: "in", user: d.user, grants: d.user.grants, clientId: d.googleClientId }
+          : { state: "out", clientId: d.googleClientId });
+      })
+      .catch(() => alive && setAuth({ state: "offline" }));
+    return () => { alive = false; };
+  }, []);
+
+  const grants = auth.grants || [];
+  const grantsKey = grants.join(",");
+  /* Rebuilt whenever the grants change, so nothing they have not been
+     taught is ever in the list to begin with. */
+  const cat = React.useMemo(
+    () => buildCatalog(grantsKey ? grantsKey.split(",") : [], trackUrl), [grantsKey]);
+
+  const [teacher, setTeacher] = useState("General");
   const [sequences, setSequences] = useState([]);
   const [durations, setDurations] = useState({});
   const [loaded, setLoaded] = useState(false);
@@ -166,7 +152,7 @@ export default function App() {
 
   const audioA = useRef(null);
   const audioB = useRef(null);
-  const trackById = (id) => ALL.find((t) => t.id === id);
+  const trackById = (id) => cat.byId.get(id);
 
   useEffect(() => {
     let alive = true;
@@ -211,7 +197,7 @@ export default function App() {
     /* one recording can back several entries (Fast Kriya is both a practice
        and a full kriya), so fetch per unique file and fan the answer out */
     const byUrl = new Map();
-    ALL.forEach((t) => {
+    cat.all.forEach((t) => {
       if (durations[t.id]) return;
       if (!byUrl.has(t.url)) byUrl.set(t.url, []);
       byUrl.get(t.url).push(t.id);
@@ -257,23 +243,61 @@ export default function App() {
   }, [loaded]);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 2400); };
+  /* A preset built from Mudra and Sahaj is meaningless to someone who
+     has done neither, so it simply isn't shown. Their own kriyas are
+     kept on the device untouched — they come back if access widens. */
+  const visibleSequences = sequences.filter((s) =>
+    s.steps.every((st) => st.p || cat.byId.has(st.t)));
   const seqDuration = (s) => s.steps.reduce((a, st) => a + (st.p ? st.p : durations[st.t] || 0), 0);
   const playOne = (t, name) => {
     setPlaying({ name: name || t.practice, steps: [{ t: t.id, k: "1" }] });
     setView("play");
   };
 
-  return (
+  const shell = (inner) => (
     <div className={view === "play" ? "k-root k-root-photo" : "k-root"}
          style={{ "--bg-photo": `url("${photoUrl(photo)}")` }}>
       <Styles />
+      {inner}
+      {toast && <div className="k-toast">{toast}</div>}
+    </div>
+  );
+
+  if (auth.state === "checking") return shell(<div className="k-gate" />);
+  if (auth.state === "offline")
+    return shell(
+      <Gate title="Can't reach the server">
+        <p className="k-sub">
+          Check your connection and reload. Nothing is lost — your kriyas
+          are saved on this device.
+        </p>
+      </Gate>);
+  if (auth.state === "out")
+    return shell(<SignIn clientId={auth.clientId} onSignedIn={(user) =>
+      setAuth({ state: "in", user, grants: user.grants, clientId: auth.clientId })} />);
+  /* signed in, but nobody has let them in yet — admins excepted, since
+     they are the ones who would have to do the letting in */
+  if (auth.state === "in" && grants.length === 0 && !(auth.user && auth.user.isAdmin))
+    return shell(
+      <Waiting
+        user={auth.user}
+        onRequested={(user) => setAuth((a) => ({ ...a, user }))}
+        onSignOut={() => signOut(setAuth, auth.clientId)} />);
+
+  if (view === "admin")
+    return shell(<Admin me={auth.user} onBack={() => setView("home")} />);
+
+  return shell(
+    <>
       <audio ref={audioA} preload="auto" />
       <audio ref={audioB} preload="auto" />
 
       {view === "home" && (
         <Home
+          cat={cat} me={auth.user} onAdmin={() => setView("admin")}
+          onSignOut={() => signOut(setAuth, auth.clientId)}
           teacher={teacher} setTeacher={setTeacher}
-          sequences={sequences} seqDuration={seqDuration} durations={durations} canSave={canSave}
+          sequences={visibleSequences} seqDuration={seqDuration} durations={durations} canSave={canSave}
           onPlayTrack={playOne}
           onPlaySeq={(s) => { setPlaying(s); setView("play"); }}
           onEdit={(s) => { setEditing(JSON.parse(JSON.stringify(s))); setView("build"); }}
@@ -284,7 +308,7 @@ export default function App() {
 
       {view === "build" && (
         <Builder
-          seq={editing} teacher={teacher} durations={durations} trackById={trackById}
+          cat={cat} seq={editing} teacher={teacher} durations={durations} trackById={trackById}
           onChange={setEditing}
           onSave={(s) => {
             const named = { ...s, name: s.name.trim() || "Untitled kriya" };
@@ -300,7 +324,7 @@ export default function App() {
         />
       )}
 
-      {view === "library" && <LibraryView durations={durations} onBack={() => setView("home")} />}
+      {view === "library" && <LibraryView cat={cat} durations={durations} onBack={() => setView("home")} />}
 
       {view === "play" && playing && (
         <Player
@@ -309,22 +333,379 @@ export default function App() {
           onExit={() => { setView("home"); setPlaying(null); }}
         />
       )}
+    </>
+  );
+}
 
-      {toast && <div className="k-toast">{toast}</div>}
+/* ------------------------------ gate ------------------------------ */
+/* Only ever rendered in the gated build. Three states: prove who you
+   are, wait for someone to let you in, or manage who is let in. */
+
+async function signOut(setAuth, clientId) {
+  try {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+  } catch (e) { /* the cookie is the session; a failed call just leaves it */ }
+  if (window.google && window.google.accounts && window.google.accounts.id)
+    window.google.accounts.id.disableAutoSelect();
+  setAuth({ state: "out", clientId });
+}
+
+function Gate({ title, children }) {
+  return (
+    <div className="k-fade k-gate">
+      <img className="k-logo k-gate-logo" src={LOGO_URL} alt="The Art of Living" />
+      <div className="k-eyebrow">Sadhana</div>
+      <h1 className="k-display k-h1 k-gate-title">{title}</h1>
+      {children}
+    </div>
+  );
+}
+
+function SignIn({ clientId, onSignedIn }) {
+  const holder = useRef(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!clientId) {
+      setError("Sign-in isn’t configured yet — GOOGLE_CLIENT_ID is missing.");
+      return;
+    }
+    let alive = true;
+
+    const send = async (credential) => {
+      setBusy(true); setError(null);
+      try {
+        const r = await fetch("/api/auth/google", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ credential }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Sign-in failed.");
+        onSignedIn(d.user);
+      } catch (e) {
+        if (alive) { setError(e.message); setBusy(false); }
+      }
+    };
+
+    const start = () => {
+      if (!alive || !holder.current) return;
+      const gsi = window.google && window.google.accounts && window.google.accounts.id;
+      if (!gsi) { setError("Couldn’t load Google sign-in."); return; }
+      gsi.initialize({ client_id: clientId, callback: (res) => send(res.credential) });
+      gsi.renderButton(holder.current, {
+        theme: "filled_black", size: "large", shape: "pill",
+        text: "continue_with", width: 260,
+      });
+    };
+
+    if (window.google && window.google.accounts) { start(); return () => { alive = false; }; }
+    const tag = document.createElement("script");
+    tag.src = "https://accounts.google.com/gsi/client";
+    tag.async = true; tag.defer = true;
+    tag.onload = start;
+    tag.onerror = () => { if (alive) setError("Couldn’t load Google sign-in."); };
+    document.head.appendChild(tag);
+    return () => { alive = false; };
+  }, [clientId, onSignedIn]);
+
+  return (
+    <Gate title="Sudarshan Kriya">
+      <p className="k-sub k-gate-sub">
+        These recordings are for people who have sat the courses. Sign in
+        and you’ll see the practices you have been taught.
+      </p>
+      <div className="k-gsi" ref={holder} />
+      {busy && <p className="k-sub">Signing you in…</p>}
+      {error && <p className="k-warn k-gate-sub">{error}</p>}
+    </Gate>
+  );
+}
+
+function Waiting({ user, onSignOut, onRequested }) {
+  const [courses, setCourses] = useState(() => (user.request ? user.request.courses : []));
+  const [note, setNote] = useState(() => (user.request ? user.request.note : ""));
+  const [editing, setEditing] = useState(!user.request);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const toggle = (id) =>
+    setCourses((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
+
+  const send = async () => {
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch("/api/access-request", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courses, note }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Could not send the request.");
+      onRequested(d.user);
+      setEditing(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /* Sent, and nobody has answered yet. */
+  if (!editing && user.request) {
+    const asked = user.request.courses.map(courseName);
+    return (
+      <Gate title="Request sent">
+        <p className="k-sub k-gate-sub">
+          You asked for {asked.length ? <b>{asked.join(", ")}</b> : "access"} as{" "}
+          <span className="k-mono">{user.email}</span>. You will be let in once
+          someone approves it — reload this page then.
+        </p>
+        <button className="k-btn k-wide k-gate-btn" onClick={() => window.location.reload()}>Reload</button>
+        <button className="k-ghost" onClick={() => setEditing(true)}>Change my request</button>
+        <button className="k-ghost" onClick={onSignOut}>Sign out</button>
+      </Gate>
+    );
+  }
+
+  return (
+    <Gate title="Which courses have you done?">
+      <p className="k-sub k-gate-sub">
+        Signed in as <span className="k-mono">{user.email}</span>. Tell us what
+        you have sat and your request goes off for approval. Only what is
+        approved opens up.
+      </p>
+
+      <div className="k-chiprow k-gate-chips">
+        {COURSES.map((c) => (
+          <button key={c.id}
+            className={"k-chip" + (courses.includes(c.id) ? " k-chip-on" : "")}
+            onClick={() => toggle(c.id)}>
+            {courses.includes(c.id) ? "✓ " : ""}{c.name}
+          </button>
+        ))}
+      </div>
+
+      <textarea
+        className="k-note-input" rows={3} maxLength={500}
+        placeholder="Anything worth adding — where you did the course, who taught it"
+        value={note} onChange={(e) => setNote(e.target.value)} />
+
+      <button className="k-btn k-primary k-wide k-gate-btn" disabled={busy} onClick={send}>
+        {busy ? "Sending…" : "Send request"}
+      </button>
+      {error && <p className="k-warn k-gate-sub">{error}</p>}
+      <button className="k-ghost" onClick={onSignOut}>Sign out</button>
+    </Gate>
+  );
+}
+
+/* --------------------------- who gets what ------------------------ */
+
+function Admin({ me, onBack }) {
+  const [users, setUsers] = useState(null);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(null);
+  /* What a pending request will be approved as. Starts at what they
+     asked for; every chip you tick before approving overrides it. */
+  const [draft, setDraft] = useState({});
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/admin/users", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        if (d.users) setUsers(d.users); else setError(d.error || "Could not load the list.");
+      })
+      .catch(() => alive && setError("Could not load the list."));
+    return () => { alive = false; };
+  }, []);
+
+  /* The server's copy of the row wins on success — it is the thing that
+     knows the request is now closed. */
+  const save = async (email, grants, isAdmin) => {
+    setSaving(email); setError(null);
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(email)}`, {
+        method: "PUT", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ grants, isAdmin }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Save failed.");
+      setUsers((prev) => prev.map((u) => (u.email === email ? d.user : u)));
+      setDraft((prev) => { const next = { ...prev }; delete next[email]; return next; });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const remove = async (email) => {
+    setSaving(email); setError(null);
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(email)}`, {
+        method: "DELETE", credentials: "same-origin",
+      });
+      if (!r.ok) throw new Error((await r.json()).error || "Could not remove.");
+      setUsers((prev) => prev.filter((u) => u.email !== email));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  /* Proves the mail path in one click, and says exactly why when it
+     fails — the access-request path deliberately stays quiet about mail
+     failures, so without this you would be guessing. */
+  const [mail, setMail] = useState(null);
+  const testEmail = async () => {
+    setMail({ state: "sending" });
+    try {
+      const r = await fetch("/api/admin/test-email", { method: "POST", credentials: "same-origin" });
+      const d = await r.json();
+      setMail(r.ok
+        ? { state: "ok", to: (d.to || []).join(", ") }
+        : { state: "fail", why: d.error || "Could not send." });
+    } catch (e) {
+      setMail({ state: "fail", why: e.message });
+    }
+  };
+
+  const chosen = (u) => draft[u.email] || (u.request ? u.request.courses : u.grants);
+  const setChosen = (u, courses) => setDraft((prev) => ({ ...prev, [u.email]: courses }));
+
+  const tap = (u, courseId) => {
+    const now = chosen(u);
+    const next = now.includes(courseId)
+      ? now.filter((g) => g !== courseId)
+      : [...now, courseId];
+    /* Someone waiting gets a draft you commit with Approve; someone
+       already in is edited live, since there is nothing to answer. */
+    if (u.request) setChosen(u, next);
+    else save(u.email, next, u.isAdmin);
+  };
+
+  /* People waiting on you belong at the top. */
+  const ordered = (users || []).slice().sort((a, b) =>
+    Boolean(b.request) - Boolean(a.request) || a.email.localeCompare(b.email));
+  const waiting = ordered.filter((u) => u.request).length;
+
+  return (
+    <div className="k-fade">
+      <header className="k-head">
+        <button className="k-ghost" onClick={onBack}>Back</button>
+        <div className="k-eyebrow">People</div>
+      </header>
+
+      <p className="k-sub">
+        Tick the courses someone has actually done. Part 2 and Sahaj each
+        carry Part 1 with them; Sanyam 2 carries everything.
+      </p>
+
+      {waiting > 0 && (
+        <p className="k-eyebrow k-mt-s k-waiting-count">
+          {waiting} waiting for an answer
+        </p>
+      )}
+
+      <div className="k-mailtest">
+        <button className="k-ghost" onClick={testEmail}
+          disabled={mail && mail.state === "sending"}>
+          {mail && mail.state === "sending" ? "Sending…" : "Send test email"}
+        </button>
+        {mail && mail.state === "ok" && (
+          <span className="k-sub k-small">Sent to {mail.to} — check spam too.</span>
+        )}
+        {mail && mail.state === "fail" && <span className="k-warn k-small">{mail.why}</span>}
+      </div>
+
+      {error && <p className="k-warn k-mt-s">{error}</p>}
+      {!users && !error && <p className="k-sub k-mt">Loading…</p>}
+      {users && users.length === 0 && <p className="k-sub k-mt">Nobody has signed in yet.</p>}
+
+      <div className="k-list k-mt">
+        {ordered.map((u) => {
+          const picked = chosen(u);
+          return (
+            <div key={u.email}
+              className={"k-card" + (u.request ? " k-card-pending" : "") + (saving === u.email ? " k-saving" : "")}>
+              <div className="k-userhead">
+                <span className="k-userwho">
+                  <span className="k-display k-username">{u.name || u.email}</span>
+                  <span className="k-sub k-mono k-small">{u.email}</span>
+                </span>
+                {u.isAdmin && <span className="k-tag">Admin</span>}
+              </div>
+
+              {u.request && (
+                <div className="k-request">
+                  <div className="k-eyebrow">Asked for</div>
+                  <div className="k-request-courses">
+                    {u.request.courses.length
+                      ? u.request.courses.map(courseName).join(" · ")
+                      : "nothing in particular"}
+                  </div>
+                  {u.request.note && <p className="k-request-note">“{u.request.note}”</p>}
+                  <div className="k-sub k-mono k-small">
+                    {new Date(u.request.at).toLocaleDateString()}
+                  </div>
+                </div>
+              )}
+
+              <div className="k-chiprow">
+                {COURSES.map((c) => (
+                  <button key={c.id}
+                    className={"k-chip k-chip-sm" + (picked.includes(c.id) ? " k-chip-on" : "")}
+                    onClick={() => tap(u, c.id)}>
+                    {picked.includes(c.id) ? "✓ " : ""}{c.name}
+                  </button>
+                ))}
+              </div>
+
+              {u.request ? (
+                <div className="k-approvebar">
+                  <button className="k-btn k-primary" disabled={saving === u.email}
+                    onClick={() => save(u.email, picked, u.isAdmin)}>
+                    {picked.length ? `Approve ${picked.length === 1 ? courseName(picked[0]) : `${picked.length} courses`}` : "Approve with nothing"}
+                  </button>
+                  <button className="k-ghost" disabled={saving === u.email}
+                    onClick={() => save(u.email, u.grants, u.isAdmin)}>Decline</button>
+                </div>
+              ) : (
+                u.email !== me.email && (
+                  <button className="k-danger" onClick={() => remove(u.email)}>Remove</button>
+                )
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 /* ------------------------------ home ------------------------------ */
 
-function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
-                onPlayTrack, onPlaySeq, onEdit, onNew, onLibrary }) {
+function Home({ cat, teacher, setTeacher, sequences, seqDuration, durations, canSave,
+                onPlayTrack, onPlaySeq, onEdit, onNew, onLibrary, onAdmin, onSignOut, me }) {
 
   const theirFull = teacher === "General"
-    ? PATH_TRACKS.filter((t) => GENERAL_FILES.includes(t.file))
-    : PATH_TRACKS.filter((t) => t.teacher === teacher);
-  const theirSolo = teacher === "General" ? [] : LIBRARY.filter((t) => t.teacher === teacher);
+    ? cat.pathTracks.filter((t) => GENERAL_FILES.includes(t.file))
+    : cat.pathTracks.filter((t) => t.teacher === teacher);
+  const theirSolo = teacher === "General" ? [] : cat.library.filter((t) => t.teacher === teacher);
   const generalSequences = teacher === "General" ? sequences.filter((s) => s.locked) : [];
+  /* The practices, one row per practice, on the General tab. Without
+     this the teacher-less ones — Mudra, Bhogar, the bells, Samaveda —
+     live only under Recordings, so being granted Part 2 or Sanyam 2
+     changes nothing you can see from the home screen. */
+  const generalPractices = teacher === "General"
+    ? cat.practices.map((name) => cat.library.find((t) => t.practice === name)).filter(Boolean)
+    : [];
   const myKriyas = sequences.filter((s) => !s.locked);
 
   const row = (t, label) => (
@@ -363,13 +744,16 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
             <h1 className="k-display k-h1">Sudarshan Kriya</h1>
           </div>
         </div>
-        <button className="k-ghost" onClick={onLibrary}>Recordings</button>
+        <span className="k-headbtns">
+          {me && me.isAdmin && <button className="k-ghost" onClick={onAdmin}>People</button>}
+          <button className="k-ghost" onClick={onLibrary}>Recordings</button>
+        </span>
       </header>
 
       <div className="k-teacherbar">
         <span className="k-eyebrow">Guided by</span>
         <div className="k-teacherrow">
-          {TEACHERS.map((t) => (
+          {cat.teachers.map((t) => (
             <button key={t} className={"k-teacher" + (t === teacher ? " k-teacher-on" : "")}
               onClick={() => setTeacher(t)}>{t}</button>
           ))}
@@ -393,10 +777,19 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
         </>
       )}
 
-      {SHARED_FULL.length > 0 && (
+      {generalPractices.length > 0 && (
+        <>
+          <div className="k-eyebrow k-mt">Practices</div>
+          <div className="k-list k-mt-s">
+            {generalPractices.map((t) => row(t, t.practice))}
+          </div>
+        </>
+      )}
+
+      {cat.sharedFull.length > 0 && (
         <>
           <div className="k-eyebrow k-mt">Any teacher</div>
-          <div className="k-list k-mt-s">{SHARED_FULL.map((t) => row(t))}</div>
+          <div className="k-list k-mt-s">{cat.sharedFull.map((t) => row(t))}</div>
         </>
       )}
 
@@ -444,18 +837,25 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
           ? "Your kriyas, your teacher and the track lengths are saved on this device."
           : "Saving is unavailable here — kriyas will last for this session only."}
       </p>
+
+      {me && (
+        <div className="k-signedin">
+          <span className="k-sub k-mono k-small">{me.email}</span>
+          <button className="k-ghost" onClick={onSignOut}>Sign out</button>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ----------------------------- builder ---------------------------- */
 
-function Builder({ seq, teacher, durations, trackById, onChange, onSave, onDelete, onCancel }) {
+function Builder({ cat, seq, teacher, durations, trackById, onChange, onSave, onDelete, onCancel }) {
   const [open, setOpen] = useState(null);
   const set = (patch) => onChange({ ...seq, ...patch });
 
   const versionsOf = (practice) => {
-    const v = LIBRARY.filter((t) => t.practice === practice);
+    const v = cat.library.filter((t) => t.practice === practice);
     return [...v].sort((a, b) => (b.teacher === teacher) - (a.teacher === teacher));
   };
 
@@ -509,7 +909,7 @@ function Builder({ seq, teacher, durations, trackById, onChange, onSave, onDelet
       <ol className="k-steps">
         {seq.steps.map((st, i) => {
           const t = st.t ? trackById(st.t) : null;
-          const sibs = t ? LIBRARY.filter((x) => x.practice === t.practice) : [];
+          const sibs = t ? cat.library.filter((x) => x.practice === t.practice) : [];
           return (
             <li key={st.k || i} className="k-step">
               <span className={st.p ? "k-bead k-bead-sm" : "k-bead"} />
@@ -541,7 +941,7 @@ function Builder({ seq, teacher, durations, trackById, onChange, onSave, onDelet
 
       <div className="k-eyebrow k-mt">Add a practice</div>
       <div className="k-chiprow">
-        {PRACTICES.map((p) => (
+        {cat.practices.map((p) => (
           <button key={p} className={"k-chip" + (open === p ? " k-chip-on" : "")} onClick={() => pick(p)}>{p}</button>
         ))}
         <button className="k-chip k-chip-alt" onClick={addPause}>+ Silence</button>
@@ -570,7 +970,7 @@ function Builder({ seq, teacher, durations, trackById, onChange, onSave, onDelet
 
 /* ---------------------------- recordings -------------------------- */
 
-function LibraryView({ durations, onBack }) {
+function LibraryView({ cat, durations, onBack }) {
   const [preview, setPreview] = useState(null);
   const el = useRef(null);
 
@@ -598,7 +998,7 @@ function LibraryView({ durations, onBack }) {
     </div>
   );
 
-  const fullNames = [...new Set(PATH_TRACKS.map((t) => t.name))];
+  const fullNames = [...new Set(cat.pathTracks.map((t) => t.name))];
 
   return (
     <div className="k-fade">
@@ -615,12 +1015,12 @@ function LibraryView({ durations, onBack }) {
 
       <div className="k-eyebrow k-mt">Practices</div>
       <div className="k-list k-mt-s">
-        {PRACTICES.map((p) => group(p, LIBRARY.filter((t) => t.practice === p)))}
+        {cat.practices.map((p) => group(p, cat.library.filter((t) => t.practice === p)))}
       </div>
 
       <div className="k-eyebrow k-mt">Full kriyas</div>
       <div className="k-list k-mt-s">
-        {fullNames.map((n) => group(n, PATH_TRACKS.filter((t) => t.name === n)))}
+        {fullNames.map((n) => group(n, cat.pathTracks.filter((t) => t.name === n)))}
       </div>
     </div>
   );
@@ -1059,6 +1459,38 @@ function Styles() {
   0% { transform:scale(1); opacity:.65; }
   100% { transform:scale(1.6); opacity:0; }
 }
+
+/* ------------------------ gate and people ------------------------- */
+.k-gate { display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; min-height:80vh; min-height:80svh; }
+.k-gate-logo { width:54px; margin-bottom:18px; opacity:1; }
+.k-gate-title { font-size:32px; margin-bottom:4px; }
+.k-gate-sub { max-width:34ch; margin-top:14px; }
+.k-gate-btn { max-width:260px; }
+.k-gsi { margin-top:26px; min-height:44px; display:flex; justify-content:center; }
+.k-headbtns { display:flex; align-items:center; gap:6px; flex:none; }
+.k-signedin { display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+.k-userhead { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.k-userwho { min-width:0; }
+.k-username { font-size:19px; display:block; }
+.k-saving { opacity:.55; }
+
+.k-waiting-count { color:var(--amber); }
+.k-mailtest { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:10px;
+  padding-top:10px; border-top:1px solid var(--line); }
+.k-card-pending { border-color:rgba(233,169,74,.55); box-shadow:0 0 0 1px rgba(233,169,74,.18); }
+.k-request { margin-top:12px; padding:11px 13px; border-radius:12px;
+  background:rgba(233,169,74,.08); border:1px solid rgba(233,169,74,.22); }
+.k-request-courses { font-size:16px; margin-top:3px; }
+.k-request-note { font-size:14px; color:var(--sandal); opacity:.85; margin:7px 0; font-style:italic; }
+.k-approvebar { display:flex; align-items:center; gap:12px; margin-top:14px; flex-wrap:wrap; }
+.k-gate-chips { justify-content:center; margin-top:22px; }
+.k-note-input { width:100%; max-width:340px; margin-top:14px; resize:vertical;
+  background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:14px;
+  color:var(--sandal); font:inherit; font-size:14px; padding:11px 13px; outline:none; }
+.k-note-input:focus { border-color:var(--amber); }
+.k-note-input::placeholder { color:var(--muted); }
 
 .k-toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
   background:#20293B; border:1px solid var(--line); color:var(--sandal);

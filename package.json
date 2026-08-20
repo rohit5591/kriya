@@ -5,7 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:cf": "vite --mode cloudflare",
+    "dev:worker": "wrangler dev",
     "build": "vite build",
+    "build:cf": "vite build --mode cloudflare",
+    "deploy": "npm run build:cf && wrangler deploy",
+    "upload-media": "node scripts/upload-media.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -18,6 +23,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "wrangler": "^4.124.0"
   }
 }

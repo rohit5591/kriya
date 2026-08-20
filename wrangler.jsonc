@@ -1,0 +1,41 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kriya",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-08-01",
+
+  // The built app is served straight from the edge; only /api/* wakes
+  // the Worker, so pages and images cost nothing extra.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "observability": { "enabled": true },
+
+  "vars": {
+    // From the Google Cloud console: OAuth 2.0 Client ID (Web application).
+    "GOOGLE_CLIENT_ID": "708054558021-jfu4pip6l5ku4v2og2uslo5dmlb1odar.apps.googleusercontent.com",
+    // Comma-separated. These addresses are admins on sight, and are what
+    // stops a fresh deployment locking you out of your own people list.
+    "ADMIN_EMAILS": "hirohitnagare@gmail.com"
+  },
+
+  // Who has done which course. A handful of records, so KV rather than
+  // a database: user:<email> -> { grants: ["part1"], isAdmin, ... }
+  "kv_namespaces": [
+    { "binding": "ACCESS", "id": "d03c8c6cbecc47a09ca2e842ef615f12" }
+  ],
+
+  // The recordings. Private bucket, no public URL — the Worker is the
+  // only thing that ever reads from it.
+  "r2_buckets": [
+    { "binding": "MEDIA", "bucket_name": "kriya-audio" }
+  ]
+
+  // Secrets, not vars — set with `npx wrangler secret put NAME`:
+  //   SESSION_SECRET   signs the login cookies (required)
+  //   RESEND_API_KEY   emails you when someone asks for access (optional)
+}

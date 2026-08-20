@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local Worker secrets (SESSION_SECRET etc) — never committed
+.dev.vars
+
+# Recordings, once they move out of public/ and live only in R2
+media/
+
+# Wrangler local state (simulated KV/R2) and build scratch
+.wrangler/
