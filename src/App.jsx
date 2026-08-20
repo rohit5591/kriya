@@ -771,7 +771,7 @@ function Styles() {
 .k-root, .k-root *, .k-root *::before, .k-root *::after { box-sizing:border-box; }
 .k-root {
   --line:#2E3852; --sandal:#EFE6D6; --muted:#8D96AB; --amber:#E9A94A; --sage:#7FB3A6; --slate:#232C40;
-  min-height:100vh; margin:0 auto; max-width:560px; padding:22px 18px 40px;
+  min-height:100vh; min-height:100svh; margin:0 auto; max-width:560px; padding:22px 18px 40px;
   background:radial-gradient(130% 70% at 50% -15%, #1D2436 0%, #0D1018 62%);
   color:var(--sandal); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   -webkit-font-smoothing:antialiased;
@@ -862,7 +862,7 @@ function Styles() {
 .k-verleft { min-width:0; }
 .k-verright { display:flex; align-items:center; gap:12px; flex:none; }
 
-.k-player { display:flex; flex-direction:column; min-height:88vh; }
+.k-player { display:flex; flex-direction:column; min-height:88vh; min-height:88svh; }
 .k-ring-wrap { position:relative; width:230px; height:230px; margin:14px auto 6px; }
 .k-ring { width:100%; height:100%; transform:rotate(-90deg); }
 .k-ring-track { fill:none; stroke:rgba(255,255,255,.07); stroke-width:6; }
@@ -902,6 +902,19 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:2px so
 @media (prefers-reduced-motion: reduce) {
   .k-fade, .k-breathe { animation:none; }
   .k-bead, .k-ring-fill { transition:none; }
+}
+/* short viewports (landscape phones, small windows) — compact the player
+   so its fixed-size ring and spacing don't force a scrollbar */
+@media (max-height: 700px) {
+  .k-head { margin-bottom:12px; }
+  .k-ring-wrap { width:170px; height:170px; margin:8px auto 4px; }
+  .k-time { font-size:24px; }
+  .k-nowplaying { font-size:22px; margin-bottom:6px; }
+  .k-progress { margin-top:12px; }
+  .k-thread-lg { margin:14px 0; gap:8px; }
+  .k-controls { gap:20px; padding-top:14px; }
+  .k-circle { width:50px; height:50px; }
+  .k-big { width:70px; height:70px; }
 }
 `}</style>
   );

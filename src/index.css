@@ -10,8 +10,10 @@ html, body {
 body {
   background: #0D1018;
   min-height: 100vh;
+  min-height: 100svh; /* svh = guaranteed-visible height, avoids mobile browser chrome forcing a scrollbar */
 }
 
 #root {
   min-height: 100vh;
+  min-height: 100svh;
 }
