@@ -552,6 +552,8 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState(null);
   const timer = useRef(null);
+  const pauseElapsed = useRef(0); /* elapsed seconds for silence steps, mutated by the
+                                      countdown interval and by seeking alike */
 
   const step = seq.steps[index];
   const done = index >= seq.steps.length;
@@ -589,10 +591,10 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
       [audioA.current, audioB.current].forEach((a) => a && a.pause());
       setTotal(step.p);
       warm(index);
-      let e = 0;
+      pauseElapsed.current = 0;
       timer.current = setInterval(() => {
-        e += 0.25; setElapsed(e);
-        if (e >= step.p) { clearInterval(timer.current); next(); }
+        pauseElapsed.current += 0.25; setElapsed(pauseElapsed.current);
+        if (pauseElapsed.current >= step.p) { clearInterval(timer.current); next(); }
       }, 250);
       return () => clearInterval(timer.current);
     }
@@ -633,10 +635,9 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
     if (!step || !step.p) return;
     clearInterval(timer.current);
     if (!isPlaying) return;
-    let e = elapsed;
     timer.current = setInterval(() => {
-      e += 0.25; setElapsed(e);
-      if (e >= step.p) { clearInterval(timer.current); next(); }
+      pauseElapsed.current += 0.25; setElapsed(pauseElapsed.current);
+      if (pauseElapsed.current >= step.p) { clearInterval(timer.current); next(); }
     }, 250);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying]);
@@ -666,6 +667,14 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
     }
   };
   const skip = (d) => { setPlaying(true); setIndex(Math.min(seq.steps.length, Math.max(0, index + d))); };
+
+  const seek = (value) => {
+    const t = Math.max(0, Math.min(total, value));
+    if (step.p) { pauseElapsed.current = t; setElapsed(t); return; }
+    const cur = elFor(index);
+    if (cur) cur.currentTime = t;
+    setElapsed(t);
+  };
 
   const pct = total ? Math.min(100, (elapsed / total) * 100) : 0;
   const R = 86, C = 2 * Math.PI * R;
@@ -712,10 +721,14 @@ function Player({ audioA, audioB, seq, trackById, durations, onExit }) {
         )}
       </div>
 
-      <div className="k-progress" role="progressbar" aria-label="Playback progress"
-        aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-        <div className="k-progress-fill" style={{ width: `${pct}%` }} />
-      </div>
+      <input
+        className="k-progress" type="range" aria-label="Playback progress"
+        min={0} max={total || 0} step={0.1}
+        value={Math.min(elapsed, total || 0)}
+        disabled={!total}
+        onChange={(e) => seek(Number(e.target.value))}
+        style={{ "--pct": `${pct}%` }}
+      />
 
       {seq.steps.length > 1 && (
         <div className="k-thread k-thread-lg">
@@ -850,10 +863,18 @@ function Styles() {
   align-items:center; justify-content:center; gap:4px; }
 .k-time { font-size:32px; }
 .k-nowplaying { font-size:27px; margin-bottom:8px; }
-.k-progress { width:100%; max-width:320px; height:5px; margin:20px auto 0;
-  border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; }
-.k-progress-fill { height:100%; background:var(--amber); border-radius:999px;
-  transition:width .3s linear; }
+.k-progress { -webkit-appearance:none; appearance:none; display:block;
+  width:100%; max-width:320px; height:20px; margin:20px auto 0; background:transparent; cursor:pointer; }
+.k-progress:disabled { cursor:default; opacity:.4; }
+.k-progress::-webkit-slider-runnable-track { height:5px; border-radius:999px;
+  background:linear-gradient(to right, var(--amber) var(--pct), rgba(255,255,255,.07) var(--pct)); }
+.k-progress::-webkit-slider-thumb { -webkit-appearance:none; appearance:none;
+  width:14px; height:14px; margin-top:-4.5px; border-radius:50%; background:var(--amber);
+  box-shadow:0 0 6px rgba(233,169,74,.5); }
+.k-progress::-moz-range-track { height:5px; border-radius:999px; background:rgba(255,255,255,.07); }
+.k-progress::-moz-range-progress { height:5px; border-radius:999px; background:var(--amber); }
+.k-progress::-moz-range-thumb { width:14px; height:14px; border-radius:50%; border:none;
+  background:var(--amber); box-shadow:0 0 6px rgba(233,169,74,.5); }
 .k-controls { display:flex; align-items:center; justify-content:center; gap:26px; margin-top:auto; padding-top:24px; }
 .k-circle { width:58px; height:58px; border-radius:50%; border:1px solid var(--line);
   background:rgba(255,255,255,.04); color:var(--sandal); font-size:24px; cursor:pointer; }
@@ -871,7 +892,7 @@ function Styles() {
 button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
 @media (prefers-reduced-motion: reduce) {
   .k-fade, .k-breathe { animation:none; }
-  .k-bead, .k-ring-fill, .k-progress-fill { transition:none; }
+  .k-bead, .k-ring-fill { transition:none; }
 }
 `}</style>
   );
