@@ -305,7 +305,7 @@ function Home({ teacher, setTeacher, sequences, seqDuration, durations, canSave,
       <header className="k-head">
         <div>
           <div className="k-eyebrow">Sadhana</div>
-          <h1 className="k-display k-h1">Kriya</h1>
+          <h1 className="k-display k-h1">Sudarshan Kriya</h1>
         </div>
         <button className="k-ghost" onClick={onLibrary}>Recordings</button>
       </header>
