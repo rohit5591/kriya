@@ -171,7 +171,8 @@ export default function App() {
       setSequences(seq);
       if (d) {
         setDurations(d.durations || {});
-        if (d.teacher && TEACHERS.includes(d.teacher)) setTeacher(d.teacher);
+        /* teacher tab is intentionally NOT restored — General is always
+           the tab you land on, regardless of what you last picked */
       }
       if (!USE_LOCAL_STORAGE && !window.storage) setCanSave(false);
       setLoaded(true);
