@@ -853,20 +853,35 @@ function Styles() {
   color:var(--sandal); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   -webkit-font-smoothing:antialiased;
   position:relative; isolation:isolate;
+  /* Text sitting straight on the photo needs to carry its own contrast,
+     since some of the photos are bright. Two layers: a tight one for
+     edge definition, a wide soft one that darkens the area behind the
+     glyphs. Cards are opaque, so they opt out below. */
+  text-shadow:0 1px 3px rgba(6,8,14,.9), 0 2px 14px rgba(6,8,14,.8);
 }
-/* Gurudev backdrop — a dim, full-screen presence rather than a hero crop.
+.k-card, .k-teacher-on, .k-primary, .k-big { text-shadow:none; }
+/* Gurudev backdrop — a full-screen presence behind the app.
    The photos vary a lot in framing, so anything that crops tight is a
-   lottery; keeping it faint and full-bleed reads well whichever one comes
-   up, and leaves every bit of text its contrast. --bg-photo set per load. */
+   lottery; full-bleed reads well whichever one comes up. --bg-photo is
+   set per load in JSX. */
 .k-root::before {
   content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
   background-image:
-    linear-gradient(180deg, rgba(13,16,24,.84) 0%, rgba(13,16,24,.88) 45%, rgba(13,16,24,.93) 100%),
+    /* a spotlight rather than a flat veil: stays dark along the top and
+       bottom edges where loose text sits, opens up across the middle so
+       the photo actually reads. Several of the photos have bright
+       backgrounds, so the edge bands are what keep text legible. */
+    linear-gradient(180deg,
+      rgba(13,16,24,.80) 0%,
+      rgba(13,16,24,.54) 26%,
+      rgba(13,16,24,.48) 55%,
+      rgba(13,16,24,.76) 84%,
+      rgba(13,16,24,.90) 100%),
     var(--bg-photo, none);
   background-size:cover, cover;
-  background-position:center, center 18%;
+  background-position:center, center 16%;
   background-repeat:no-repeat, no-repeat;
-  filter:saturate(.75);
+  filter:saturate(.92);
 }
 .k-display { font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif; }
 .k-mono { font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; }
@@ -964,7 +979,9 @@ function Styles() {
 .k-player { display:flex; flex-direction:column; min-height:88vh; min-height:88svh; }
 .k-ring-wrap { position:relative; width:230px; height:230px; margin:14px auto 6px; }
 .k-ring { width:100%; height:100%; transform:rotate(-90deg); }
-.k-ring-track { fill:none; stroke:rgba(255,255,255,.07); stroke-width:6; }
+/* these thin tracks used to be near-invisible once a bright photo sat
+   behind them, so they carry a little more weight now */
+.k-ring-track { fill:none; stroke:rgba(255,255,255,.2); stroke-width:6; }
 .k-ring-fill { fill:none; stroke:var(--amber); stroke-width:6; stroke-linecap:round;
   transition:stroke-dashoffset .3s linear; filter:drop-shadow(0 0 8px rgba(233,169,74,.35)); }
 .k-ring-inner { position:absolute; inset:0; display:flex; flex-direction:column;
@@ -983,11 +1000,11 @@ function Styles() {
   width:100%; max-width:320px; height:20px; margin:20px auto 0; background:transparent; cursor:pointer; }
 .k-progress:disabled { cursor:default; opacity:.4; }
 .k-progress::-webkit-slider-runnable-track { height:5px; border-radius:999px;
-  background:linear-gradient(to right, var(--amber) var(--pct), rgba(255,255,255,.07) var(--pct)); }
+  background:linear-gradient(to right, var(--amber) var(--pct), rgba(255,255,255,.2) var(--pct)); }
 .k-progress::-webkit-slider-thumb { -webkit-appearance:none; appearance:none;
   width:14px; height:14px; margin-top:-4.5px; border-radius:50%; background:var(--amber);
   box-shadow:0 0 6px rgba(233,169,74,.5); }
-.k-progress::-moz-range-track { height:5px; border-radius:999px; background:rgba(255,255,255,.07); }
+.k-progress::-moz-range-track { height:5px; border-radius:999px; background:rgba(255,255,255,.2); }
 .k-progress::-moz-range-progress { height:5px; border-radius:999px; background:var(--amber); }
 .k-progress::-moz-range-thumb { width:14px; height:14px; border-radius:50%; border:none;
   background:var(--amber); box-shadow:0 0 6px rgba(233,169,74,.5); }
