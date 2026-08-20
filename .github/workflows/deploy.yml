@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy the moved-to notice to GitHub Pages
 
 on:
   push:
@@ -21,22 +21,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Upload build artifact
+      # The app itself now lives on Cloudflare, behind a sign-in, with the
+      # recordings in a private bucket. All Pages serves is a notice
+      # pointing old bookmarks at the new address — deliberately not the
+      # app, and deliberately without public/audio, which is what used to
+      # make every recording downloadable by anyone with the link.
+      - name: Upload the moved-to notice
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: pages-notice
 
   deploy:
     needs: build
@@ -45,6 +38,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy the moved-to notice to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
