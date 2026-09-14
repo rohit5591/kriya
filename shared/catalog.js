@@ -41,6 +41,7 @@ export function effectiveCourses(grants) {
 const FILES = [
   { practice: "Padmasadhana",    teacher: "Vishal",        course: "part1",   file: "Vishal - Padmasadhana.mp3" },
   { practice: "Padmasadhana",    teacher: "Mayur Karthik", course: "part1",   file: "Mayur Karthik - Padmasadhana.mp3" },
+  { practice: "Guruji Kriya",                              course: "part1",   adminOnly: true, file: "Guruji Kriya Audio.mp3" },
   { practice: "Bhogar Pranayam",                           course: "sanyam2", file: "Bhogar Pranayam.mp3" },
   { practice: "Mudra Pranayam",                            course: "part2",   file: "Mudra Pranayams.mp3" },
   { practice: "3 Stage",         teacher: "Dinesh",        course: "part1",   file: "3-Stage - Dinesh.mp3" },
@@ -53,6 +54,7 @@ const FILES = [
   { practice: "Samaveda",                                  course: "sanyam2", variant: "Long",    file: "Samaveda - Long.mp3" },
   { practice: "Samaveda",                                  course: "sanyam2", variant: "Short",   file: "Samaveda - Short.mp3" },
   { practice: "OM",              teacher: "Dinesh",        course: "part1",   file: "OM - Dinesh.mp3" },
+  { practice: "Kriya",                                     course: "part1",   variant: "Silent",  file: "Kriya - Empty Audio.mp3" },
   { practice: "Kriya",                                     course: "part1",   variant: "Silent",  file: "Kriya - Empty Audio.mp3" },
 ];
 
@@ -97,17 +99,29 @@ export const ALL_TRACKS = [...LIBRARY, ...PATH_TRACKS];
 export const TRACK_BY_ID = new Map(ALL_TRACKS.map((t) => [t.id, t]));
 
 /* The one question the Worker asks before it opens the bucket. */
-export function mayPlay(trackId, grants) {
+export function mayPlay(trackId, grants, user = null) {
   const t = TRACK_BY_ID.get(trackId);
   if (!t) return false;
+
+  if (t.adminOnly) {
+    const email = String(user?.email || "").toLowerCase();
+    return Boolean(user?.isAdmin || email === "hirohitnagare@gmail.com");
+  }
+
   return effectiveCourses(grants).has(t.course);
 }
 
 /* Everything the app can show a given person, derived once per sign-in.
    Anything they haven't been taught simply isn't in here. */
-export function buildCatalog(grants, urlFor = apiAudioUrl) {
+export function buildCatalog(grants, urlFor = apiAudioUrl, user = null) {
   const open = effectiveCourses(grants);
-  const allowed = (t) => open.has(t.course);
+  const allowed = (t) => {
+    if (t.adminOnly) {
+      const email = String(user?.email || "").toLowerCase();
+      return Boolean(user?.isAdmin || email === "hirohitnagare@gmail.com");
+    }
+    return open.has(t.course);
+  };
   const dress = (t) => ({ ...t, url: urlFor(t) });
 
   const library = LIBRARY.filter(allowed).map(dress);

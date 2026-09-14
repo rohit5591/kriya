@@ -7,7 +7,7 @@
    would have been ceremony. Shape:  user:<email> -> { grants, ... }
    ================================================================== */
 
-import { TRACK_BY_ID, effectiveCourses, r2Key, COURSE_IDS, courseName } from "../shared/catalog.js";
+import { TRACK_BY_ID, r2Key, COURSE_IDS, courseName, mayPlay } from "../shared/catalog.js";
 import {
   verifyGoogleIdToken, signSession, readSession, sessionCookie, clearedCookie,
 } from "./auth.js";
@@ -187,7 +187,7 @@ async function handleAudio(request, env, trackId) {
 
   /* The check that actually matters. A 404 rather than a 403: someone
      who has not done the course learns nothing about what exists. */
-  if (!effectiveCourses(user.grants).has(track.course))
+  if (!mayPlay(trackId, user.grants, user))
     return json({ error: "No such recording." }, { status: 404 });
 
   const range = request.headers.get("Range");

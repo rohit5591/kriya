@@ -133,7 +133,9 @@ export default function App() {
   /* Rebuilt whenever the grants change, so nothing they have not been
      taught is ever in the list to begin with. */
   const cat = React.useMemo(
-    () => buildCatalog(grantsKey ? grantsKey.split(",") : [], trackUrl), [grantsKey]);
+    () => buildCatalog(grantsKey ? grantsKey.split(",") : [], trackUrl, auth.user || null),
+    [grantsKey, auth.user],
+  );
 
   const [teacher, setTeacher] = useState("General");
   const [sequences, setSequences] = useState([]);
