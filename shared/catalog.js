@@ -41,7 +41,6 @@ export function effectiveCourses(grants) {
 const FILES = [
   { practice: "Padmasadhana",    teacher: "Vishal",        course: "part1",   file: "Vishal - Padmasadhana.mp3" },
   { practice: "Padmasadhana",    teacher: "Mayur Karthik", course: "part1",   file: "Mayur Karthik - Padmasadhana.mp3" },
-  { practice: "Guruji Kriya",                              course: "part1",   adminOnly: true, file: "Guruji Kriya Audio.mp3" },
   { practice: "Bhogar Pranayam",                           course: "sanyam2", file: "Bhogar Pranayam.mp3" },
   { practice: "Mudra Pranayam",                            course: "part2",   file: "Mudra Pranayams.mp3" },
   { practice: "3 Stage",         teacher: "Dinesh",        course: "part1",   file: "3-Stage - Dinesh.mp3" },
